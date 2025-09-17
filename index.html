@@ -24,11 +24,85 @@
         border: 2px solid #00ffff;
         border-radius: 10px;
         box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+        max-width: 100vw;
+        max-height: 100vh;
     }
     
     canvas {
         display: block;
         background: radial-gradient(circle at center, #0a0a0a 0%, #000000 100%);
+        max-width: 100%;
+        height: auto;
+    }
+    
+    @media (max-width: 768px) {
+        body {
+            padding: 10px;
+            box-sizing: border-box;
+        }
+        
+        .game-container {
+            width: 100%;
+            height: calc(100vh - 20px);
+            border-radius: 5px;
+            border-width: 1px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        canvas {
+            width: 100% !important;
+            height: auto !important;
+            max-height: calc(100vh - 40px);
+            object-fit: contain;
+        }
+        
+        .mobile-controls {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 180px;
+            z-index: 10;
+        }
+        
+        .virtual-joystick {
+            bottom: 15px;
+            left: 15px;
+            width: 100px;
+            height: 100px;
+        }
+        
+        .shoot-button {
+            bottom: 15px;
+            right: 15px;
+            width: 70px;
+            height: 70px;
+            font-size: 12px;
+        }
+        
+        .ui {
+            font-size: 16px;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .virtual-joystick {
+            width: 80px;
+            height: 80px;
+        }
+        
+        .shoot-button {
+            width: 60px;
+            height: 60px;
+            font-size: 10px;
+        }
+        
+        .ui {
+            font-size: 14px;
+        }
     }
     
     .ui {
@@ -118,20 +192,6 @@
         box-shadow: 0 0 15px rgba(255, 255, 0, 0.8);
     }
     
-    .control-mode {
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        color: #888;
-        font-size: 12px;
-        cursor: pointer;
-        user-select: none;
-    }
-    
-    .control-mode:hover {
-        color: #00ffff;
-    }
-    
     @media (max-width: 768px) {
         .mobile-controls {
             display: block;
@@ -158,9 +218,6 @@
         <div class="controls">
             WASD/Arrow Keys: Move | Space: Shoot
         </div>
-        <div class="control-mode" id="controlMode" onclick="switchControlMode()">
-            Mode: Joystick
-        </div>
         <div class="mobile-controls" id="mobileControls">
             <div class="virtual-joystick" id="joystick">
                 <div class="joystick-knob" id="joystickKnob"></div>
@@ -173,8 +230,63 @@
 
 ```
 <script>
+    // Game setup and canvas sizing
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
+    
+    // Responsive canvas sizing
+    function resizeCanvas() {
+        const isMobileDevice = window.innerWidth <= 768;
+        
+        if (isMobileDevice) {
+            // Mobile: fit to screen with aspect ratio preservation
+            const maxWidth = window.innerWidth - 20; // Account for padding
+            const maxHeight = window.innerHeight - 200; // Account for controls and UI
+            const aspectRatio = 800 / 600;
+            
+            let canvasWidth = maxWidth;
+            let canvasHeight = canvasWidth / aspectRatio;
+            
+            if (canvasHeight > maxHeight) {
+                canvasHeight = maxHeight;
+                canvasWidth = canvasHeight * aspectRatio;
+            }
+            
+            canvas.width = 800; // Keep internal resolution
+            canvas.height = 600;
+            canvas.style.width = canvasWidth + 'px';
+            canvas.style.height = canvasHeight + 'px';
+            
+            // Update scale for touch calculations
+            window.canvasScale = {
+                x: 800 / canvasWidth,
+                y: 600 / canvasHeight
+            };
+        } else {
+            // Desktop: original size
+            canvas.width = 800;
+            canvas.height = 600;
+            canvas.style.width = '800px';
+            canvas.style.height = '600px';
+            window.canvasScale = { x: 1, y: 1 };
+        }
+    }
+    
+    // Initialize canvas size
+    resizeCanvas();
+    
+    // Resize on orientation change or window resize
+    window.addEventListener('resize', () => {
+        setTimeout(resizeCanvas, 100);
+        isMobile = window.innerWidth <= 768;
+        if (isMobile && !mobileControlsInitialized) {
+            initMobileControls();
+        }
+    });
+    
+    window.addEventListener('orientationchange', () => {
+        setTimeout(resizeCanvas, 500);
+    });
     
     // Game state
     let gameRunning = true;
@@ -201,19 +313,12 @@
     let lastShot = 0;
     const shootCooldown = 150;
     
-    // Mobile controls
-    let controlMode = 'joystick'; // 'joystick', 'drag', 'tilt'
+    // Mobile controls (virtual joystick only)
     let joystickActive = false;
     let joystickCenter = { x: 0, y: 0 };
     let joystickPosition = { x: 0, y: 0 };
-    let touchMove = { x: 0, y: 0 };
     let isMobile = window.innerWidth <= 768;
-    let tiltSupported = false;
-    
-    // Check for device orientation support
-    if (window.DeviceOrientationEvent) {
-        tiltSupported = true;
-    }
+    let mobileControlsInitialized = false;
     
     // Create starfield
     for (let i = 0; i < 100; i++) {
@@ -238,8 +343,11 @@
         keys[e.code] = false;
     });
     
-    // Mobile touch controls
+    // Mobile touch controls (virtual joystick only)
     function initMobileControls() {
+        if (mobileControlsInitialized) return;
+        mobileControlsInitialized = true;
+        
         const joystick = document.getElementById('joystick');
         const joystickKnob = document.getElementById('joystickKnob');
         const shootButton = document.getElementById('shootButton');
@@ -247,8 +355,6 @@
         // Virtual Joystick
         joystick.addEventListener('touchstart', (e) => {
             e.preventDefault();
-            if (controlMode !== 'joystick') return;
-            
             joystickActive = true;
             const rect = joystick.getBoundingClientRect();
             joystickCenter = {
@@ -259,13 +365,13 @@
         
         joystick.addEventListener('touchmove', (e) => {
             e.preventDefault();
-            if (!joystickActive || controlMode !== 'joystick') return;
+            if (!joystickActive) return;
             
             const touch = e.touches[0];
             const dx = touch.clientX - joystickCenter.x;
             const dy = touch.clientY - joystickCenter.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
-            const maxDistance = 40;
+            const maxDistance = isMobile ? 30 : 40; // Smaller on mobile
             
             if (distance <= maxDistance) {
                 joystickPosition = { x: dx, y: dy };
@@ -276,14 +382,17 @@
                 };
             }
             
-            joystickKnob.style.transform = `translate(${joystickPosition.x - 20}px, ${joystickPosition.y - 20}px)`;
+            const offsetX = isMobile ? joystickPosition.x - 15 : joystickPosition.x - 20;
+            const offsetY = isMobile ? joystickPosition.y - 15 : joystickPosition.y - 20;
+            joystickKnob.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
         });
         
         joystick.addEventListener('touchend', (e) => {
             e.preventDefault();
             joystickActive = false;
             joystickPosition = { x: 0, y: 0 };
-            joystickKnob.style.transform = 'translate(-20px, -20px)';
+            const offset = isMobile ? -15 : -20;
+            joystickKnob.style.transform = `translate(${offset}px, ${offset}px)`;
         });
         
         // Shoot button
@@ -295,89 +404,25 @@
             }
         });
         
-        // Direct touch controls for drag mode
-        canvas.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            if (controlMode !== 'drag') return;
-            
-            const rect = canvas.getBoundingClientRect();
-            const touch = e.touches[0];
-            const x = touch.clientX - rect.left;
-            const y = touch.clientY - rect.top;
-            
-            // Check if touching near player
-            if (Math.abs(x - player.x - player.width/2) < 50 && 
-                Math.abs(y - player.y - player.height/2) < 50) {
-                touchMove.active = true;
-                touchMove.offsetX = x - player.x;
-                touchMove.offsetY = y - player.y;
+        // Prevent scrolling on mobile
+        document.body.addEventListener('touchstart', (e) => {
+            if (e.target.tagName !== 'INPUT') {
+                e.preventDefault();
             }
-        });
+        }, { passive: false });
         
-        canvas.addEventListener('touchmove', (e) => {
+        document.body.addEventListener('touchend', (e) => {
             e.preventDefault();
-            if (controlMode !== 'drag' || !touchMove.active) return;
-            
-            const rect = canvas.getBoundingClientRect();
-            const touch = e.touches[0];
-            const x = touch.clientX - rect.left;
-            const y = touch.clientY - rect.top;
-            
-            player.x = Math.max(0, Math.min(canvas.width - player.width, x - touchMove.offsetX));
-            player.y = Math.max(0, Math.min(canvas.height - player.height, y - touchMove.offsetY));
-        });
+        }, { passive: false });
         
-        canvas.addEventListener('touchend', (e) => {
+        document.body.addEventListener('touchmove', (e) => {
             e.preventDefault();
-            touchMove.active = false;
-            
-            // Shoot on tap (for drag mode)
-            if (controlMode === 'drag' && gameRunning && Date.now() - lastShot > shootCooldown) {
-                createBullet(player.x + player.width / 2 - 1.5, player.y);
-                lastShot = Date.now();
-            }
-        });
+        }, { passive: false });
     }
     
-    // Device orientation (tilt) controls
-    function initTiltControls() {
-        if (!tiltSupported) return;
-        
-        window.addEventListener('deviceorientation', (e) => {
-            if (controlMode !== 'tilt' || !gameRunning) return;
-            
-            const gamma = e.gamma; // Left-right tilt
-            const beta = e.beta;   // Front-back tilt
-            
-            if (gamma !== null) {
-                // Convert tilt to movement (-30 to 30 degrees)
-                const moveX = Math.max(-1, Math.min(1, gamma / 30)) * player.speed;
-                const moveY = Math.max(-1, Math.min(1, (beta - 45) / 30)) * player.speed;
-                
-                player.x = Math.max(0, Math.min(canvas.width - player.width, player.x + moveX));
-                player.y = Math.max(0, Math.min(canvas.height - player.height, player.y + moveY));
-            }
-        });
-    }
-    
-    function switchControlMode() {
-        const modes = tiltSupported ? ['joystick', 'drag', 'tilt'] : ['joystick', 'drag'];
-        const currentIndex = modes.indexOf(controlMode);
-        controlMode = modes[(currentIndex + 1) % modes.length];
-        
-        document.getElementById('controlMode').textContent = `Mode: ${controlMode.charAt(0).toUpperCase() + controlMode.slice(1)}`;
-        
-        // Reset positions and states
-        joystickActive = false;
-        touchMove.active = false;
-        joystickPosition = { x: 0, y: 0 };
-        document.getElementById('joystickKnob').style.transform = 'translate(-20px, -20px)';
-    }
-    
-    // Initialize mobile controls
+    // Initialize mobile controls only on mobile
     if (isMobile) {
         initMobileControls();
-        initTiltControls();
     }
     
     // Particle system
@@ -430,9 +475,10 @@
         if ((keys['KeyS'] || keys['ArrowDown'])) moveY += player.speed;
         
         // Mobile joystick controls
-        if (controlMode === 'joystick' && joystickActive) {
-            moveX += (joystickPosition.x / 40) * player.speed;
-            moveY += (joystickPosition.y / 40) * player.speed;
+        if (isMobile && joystickActive) {
+            const maxDistance = isMobile ? 30 : 40;
+            moveX += (joystickPosition.x / maxDistance) * player.speed;
+            moveY += (joystickPosition.y / maxDistance) * player.speed;
         }
         
         // Apply movement
@@ -441,12 +487,6 @@
         
         // Desktop shooting
         if (keys['Space'] && Date.now() - lastShot > shootCooldown) {
-            createBullet(player.x + player.width / 2 - 1.5, player.y);
-            lastShot = Date.now();
-        }
-        
-        // Auto-shoot for tilt mode
-        if (controlMode === 'tilt' && Date.now() - lastShot > shootCooldown * 2) {
             createBullet(player.x + player.width / 2 - 1.5, player.y);
             lastShot = Date.now();
         }
