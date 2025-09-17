@@ -24,84 +24,36 @@
         border: 2px solid #00ffff;
         border-radius: 10px;
         box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
-        max-width: 100vw;
-        max-height: 100vh;
     }
     
     canvas {
         display: block;
         background: radial-gradient(circle at center, #0a0a0a 0%, #000000 100%);
-        max-width: 100%;
-        height: auto;
     }
     
+    /* Mobile responsive styles */
     @media (max-width: 768px) {
         body {
-            padding: 10px;
-            box-sizing: border-box;
+            padding: 0;
+            align-items: flex-start;
         }
         
         .game-container {
-            width: 100%;
-            height: calc(100vh - 20px);
-            border-radius: 5px;
-            border-width: 1px;
+            width: 100vw;
+            height: 100vh;
+            border: none;
+            border-radius: 0;
+            box-shadow: none;
             display: flex;
-            flex-direction: column;
-            justify-content: center;
             align-items: center;
+            justify-content: center;
         }
         
         canvas {
-            width: 100% !important;
-            height: auto !important;
-            max-height: calc(100vh - 40px);
+            width: 100vw !important;
+            height: calc(100vw * 16/9) !important;
+            max-height: 100vh;
             object-fit: contain;
-        }
-        
-        .mobile-controls {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: 180px;
-            z-index: 10;
-        }
-        
-        .virtual-joystick {
-            bottom: 15px;
-            left: 15px;
-            width: 100px;
-            height: 100px;
-        }
-        
-        .shoot-button {
-            bottom: 15px;
-            right: 15px;
-            width: 70px;
-            height: 70px;
-            font-size: 12px;
-        }
-        
-        .ui {
-            font-size: 16px;
-        }
-    }
-    
-    @media (max-width: 480px) {
-        .virtual-joystick {
-            width: 80px;
-            height: 80px;
-        }
-        
-        .shoot-button {
-            width: 60px;
-            height: 60px;
-            font-size: 10px;
-        }
-        
-        .ui {
-            font-size: 14px;
         }
     }
     
@@ -199,6 +151,12 @@
         .controls {
             display: none;
         }
+        .game-over {
+            font-size: 20px;
+        }
+        .game-over div:last-child {
+            font-size: 14px !important;
+        }
     }
 </style>
 ```
@@ -206,7 +164,7 @@
 </head>
 <body>
     <div class="game-container">
-        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <canvas id="gameCanvas"></canvas>
         <div class="ui">
             <div>Score: <span id="score">0</span></div>
             <div>Lives: <span id="lives">3</span></div>
@@ -230,63 +188,39 @@
 
 ```
 <script>
-    // Game setup and canvas sizing
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     
-    // Responsive canvas sizing
-    function resizeCanvas() {
+    // Responsive canvas setup
+    function setupCanvas() {
         const isMobileDevice = window.innerWidth <= 768;
         
         if (isMobileDevice) {
-            // Mobile: fit to screen with aspect ratio preservation
-            const maxWidth = window.innerWidth - 20; // Account for padding
-            const maxHeight = window.innerHeight - 200; // Account for controls and UI
-            const aspectRatio = 800 / 600;
+            // Mobile: 9:16 aspect ratio, full width
+            const width = window.innerWidth;
+            const height = Math.floor(width * 16 / 9);
             
-            let canvasWidth = maxWidth;
-            let canvasHeight = canvasWidth / aspectRatio;
-            
-            if (canvasHeight > maxHeight) {
-                canvasHeight = maxHeight;
-                canvasWidth = canvasHeight * aspectRatio;
+            // If calculated height exceeds viewport, adjust to fit
+            const maxHeight = window.innerHeight;
+            if (height > maxHeight) {
+                canvas.height = maxHeight;
+                canvas.width = Math.floor(maxHeight * 9 / 16);
+            } else {
+                canvas.width = width;
+                canvas.height = height;
             }
-            
-            canvas.width = 800; // Keep internal resolution
-            canvas.height = 600;
-            canvas.style.width = canvasWidth + 'px';
-            canvas.style.height = canvasHeight + 'px';
-            
-            // Update scale for touch calculations
-            window.canvasScale = {
-                x: 800 / canvasWidth,
-                y: 600 / canvasHeight
-            };
         } else {
-            // Desktop: original size
+            // Desktop: fixed size
             canvas.width = 800;
             canvas.height = 600;
-            canvas.style.width = '800px';
-            canvas.style.height = '600px';
-            window.canvasScale = { x: 1, y: 1 };
         }
+        
+        return { width: canvas.width, height: canvas.height, isMobile: isMobileDevice };
     }
     
-    // Initialize canvas size
-    resizeCanvas();
-    
-    // Resize on orientation change or window resize
-    window.addEventListener('resize', () => {
-        setTimeout(resizeCanvas, 100);
-        isMobile = window.innerWidth <= 768;
-        if (isMobile && !mobileControlsInitialized) {
-            initMobileControls();
-        }
-    });
-    
-    window.addEventListener('orientationchange', () => {
-        setTimeout(resizeCanvas, 500);
-    });
+    // Initialize canvas
+    const gameSettings = setupCanvas();
+    let isMobile = gameSettings.isMobile;
     
     // Game state
     let gameRunning = true;
@@ -317,8 +251,23 @@
     let joystickActive = false;
     let joystickCenter = { x: 0, y: 0 };
     let joystickPosition = { x: 0, y: 0 };
-    let isMobile = window.innerWidth <= 768;
-    let mobileControlsInitialized = false;
+    
+    // Handle window resize
+    window.addEventListener('resize', () => {
+        const newSettings = setupCanvas();
+        isMobile = newSettings.isMobile;
+        
+        // Adjust player position to stay within new bounds
+        player.x = Math.min(player.x, canvas.width - player.width);
+        player.y = Math.min(player.y, canvas.height - player.height);
+        
+        // Reinitialize mobile controls if needed
+        if (isMobile && !joystickInitialized) {
+            initMobileControls();
+        }
+    });
+    
+    let joystickInitialized = false;
     
     // Create starfield
     for (let i = 0; i < 100; i++) {
@@ -345,9 +294,6 @@
     
     // Mobile touch controls (virtual joystick only)
     function initMobileControls() {
-        if (mobileControlsInitialized) return;
-        mobileControlsInitialized = true;
-        
         const joystick = document.getElementById('joystick');
         const joystickKnob = document.getElementById('joystickKnob');
         const shootButton = document.getElementById('shootButton');
@@ -371,7 +317,7 @@
             const dx = touch.clientX - joystickCenter.x;
             const dy = touch.clientY - joystickCenter.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
-            const maxDistance = isMobile ? 30 : 40; // Smaller on mobile
+            const maxDistance = 40;
             
             if (distance <= maxDistance) {
                 joystickPosition = { x: dx, y: dy };
@@ -382,17 +328,14 @@
                 };
             }
             
-            const offsetX = isMobile ? joystickPosition.x - 15 : joystickPosition.x - 20;
-            const offsetY = isMobile ? joystickPosition.y - 15 : joystickPosition.y - 20;
-            joystickKnob.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
+            joystickKnob.style.transform = `translate(${joystickPosition.x - 20}px, ${joystickPosition.y - 20}px)`;
         });
         
         joystick.addEventListener('touchend', (e) => {
             e.preventDefault();
             joystickActive = false;
             joystickPosition = { x: 0, y: 0 };
-            const offset = isMobile ? -15 : -20;
-            joystickKnob.style.transform = `translate(${offset}px, ${offset}px)`;
+            joystickKnob.style.transform = 'translate(-20px, -20px)';
         });
         
         // Shoot button
@@ -403,26 +346,12 @@
                 lastShot = Date.now();
             }
         });
-        
-        // Prevent scrolling on mobile
-        document.body.addEventListener('touchstart', (e) => {
-            if (e.target.tagName !== 'INPUT') {
-                e.preventDefault();
-            }
-        }, { passive: false });
-        
-        document.body.addEventListener('touchend', (e) => {
-            e.preventDefault();
-        }, { passive: false });
-        
-        document.body.addEventListener('touchmove', (e) => {
-            e.preventDefault();
-        }, { passive: false });
     }
     
     // Initialize mobile controls only on mobile
     if (isMobile) {
         initMobileControls();
+        joystickInitialized = true;
     }
     
     // Particle system
@@ -476,9 +405,8 @@
         
         // Mobile joystick controls
         if (isMobile && joystickActive) {
-            const maxDistance = isMobile ? 30 : 40;
-            moveX += (joystickPosition.x / maxDistance) * player.speed;
-            moveY += (joystickPosition.y / maxDistance) * player.speed;
+            moveX += (joystickPosition.x / 40) * player.speed;
+            moveY += (joystickPosition.y / 40) * player.speed;
         }
         
         // Apply movement
