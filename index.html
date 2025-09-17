@@ -76,6 +76,91 @@
         font-size: 24px;
         text-shadow: 0 0 20px rgba(255, 68, 68, 0.8);
         display: none;
+        z-index: 100;
+    }
+    
+    .game-panel {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.9);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 100;
+        backdrop-filter: blur(5px);
+    }
+    
+    .panel-title {
+        font-size: 36px;
+        color: #00ffff;
+        text-shadow: 0 0 20px rgba(0, 255, 255, 0.8);
+        margin-bottom: 20px;
+        animation: glow 2s ease-in-out infinite alternate;
+    }
+    
+    .panel-subtitle {
+        font-size: 18px;
+        color: #888;
+        margin-bottom: 30px;
+        text-align: center;
+        line-height: 1.4;
+    }
+    
+    .game-button {
+        background: linear-gradient(45deg, #00ffff, #0088ff);
+        border: none;
+        color: #000;
+        font-family: 'Courier New', monospace;
+        font-size: 20px;
+        font-weight: bold;
+        padding: 15px 40px;
+        border-radius: 10px;
+        cursor: pointer;
+        margin: 10px;
+        transition: all 0.3s ease;
+        box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+        text-transform: uppercase;
+    }
+    
+    .game-button:hover {
+        transform: scale(1.05);
+        box-shadow: 0 0 30px rgba(0, 255, 255, 0.6);
+        background: linear-gradient(45deg, #00ffff, #44aaff);
+    }
+    
+    .game-button:active {
+        transform: scale(0.95);
+    }
+    
+    .game-button.secondary {
+        background: linear-gradient(45deg, #666, #888);
+        color: #fff;
+        box-shadow: 0 0 20px rgba(128, 128, 128, 0.3);
+    }
+    
+    .game-button.secondary:hover {
+        background: linear-gradient(45deg, #777, #999);
+        box-shadow: 0 0 30px rgba(128, 128, 128, 0.6);
+    }
+    
+    .stats {
+        color: #00ffff;
+        font-size: 18px;
+        margin: 20px 0;
+        text-align: center;
+    }
+    
+    .stats div {
+        margin: 5px 0;
+    }
+    
+    @keyframes glow {
+        from { text-shadow: 0 0 20px rgba(0, 255, 255, 0.8); }
+        to { text-shadow: 0 0 30px rgba(0, 255, 255, 1), 0 0 40px rgba(0, 255, 255, 0.8); }
     }
     
     .controls {
@@ -154,8 +239,16 @@
         .game-over {
             font-size: 20px;
         }
-        .game-over div:last-child {
-            font-size: 14px !important;
+        .game-button {
+            font-size: 18px;
+            padding: 12px 30px;
+        }
+        .panel-title {
+            font-size: 28px;
+        }
+        .panel-subtitle {
+            font-size: 16px;
+            padding: 0 20px;
         }
     }
 </style>
@@ -169,24 +262,59 @@
             <div>Score: <span id="score">0</span></div>
             <div>Lives: <span id="lives">3</span></div>
         </div>
-        <div class="game-over" id="gameOver">
-            <div>GAME OVER</div>
-            <div style="font-size: 16px; margin-top: 10px;">Press SPACE to restart</div>
-        </div>
-        <div class="controls">
-            WASD/Arrow Keys: Move | Space: Shoot
-        </div>
-        <div class="mobile-controls" id="mobileControls">
-            <div class="virtual-joystick" id="joystick">
-                <div class="joystick-knob" id="joystickKnob"></div>
-            </div>
-            <div class="shoot-button" id="shootButton">
-                FIRE
-            </div>
-        </div>
-    </div>
 
 ```
+    <!-- Start Screen -->
+    <div class="game-panel" id="startPanel">
+        <div class="panel-title">SPACE SHOOTER</div>
+        <div class="panel-subtitle">
+            Destroy enemy ships and survive as long as possible!<br>
+            Use WASD or virtual joystick to move, space or fire button to shoot.
+        </div>
+        <button class="game-button" onclick="startGame()">PLAY GAME</button>
+    </div>
+    
+    <!-- Pause Screen -->
+    <div class="game-panel" id="pausePanel" style="display: none;">
+        <div class="panel-title">GAME PAUSED</div>
+        <div class="panel-subtitle">Take a break and resume when ready!</div>
+        <div class="stats">
+            <div>Score: <span id="pauseScore">0</span></div>
+            <div>Lives: <span id="pauseLives">3</span></div>
+        </div>
+        <button class="game-button" onclick="resumeGame()">RESUME</button>
+        <button class="game-button secondary" onclick="restartFromPause()">RESTART</button>
+    </div>
+    
+    <!-- Game Over Screen -->
+    <div class="game-panel" id="gameOverPanel" style="display: none;">
+        <div class="panel-title" style="color: #ff4444;">GAME OVER</div>
+        <div class="panel-subtitle">Your ship has been destroyed!</div>
+        <div class="stats">
+            <div>Final Score: <span id="finalScore">0</span></div>
+            <div>Enemies Destroyed: <span id="enemiesKilled">0</span></div>
+        </div>
+        <button class="game-button" onclick="startGame()">PLAY AGAIN</button>
+        <button class="game-button secondary" onclick="backToStart()">MAIN MENU</button>
+    </div>
+    
+    <div class="game-over" id="gameOver" style="display: none;">
+        <div>GAME OVER</div>
+        <div style="font-size: 16px; margin-top: 10px;">Press SPACE to restart</div>
+    </div>
+    <div class="controls">
+        WASD/Arrow Keys: Move | Space: Shoot
+    </div>
+    <div class="mobile-controls" id="mobileControls">
+        <div class="virtual-joystick" id="joystick">
+            <div class="joystick-knob" id="joystickKnob"></div>
+        </div>
+        <div class="shoot-button" id="shootButton">
+            FIRE
+        </div>
+    </div>
+</div>
+
 <script>
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
@@ -223,9 +351,10 @@
     let isMobile = gameSettings.isMobile;
     
     // Game state
-    let gameRunning = true;
+    let gameState = 'start'; // 'start', 'playing', 'paused', 'gameOver'
     let score = 0;
     let lives = 3;
+    let enemiesKilled = 0;
     
     // Player
     const player = {
@@ -282,10 +411,23 @@
     // Event listeners
     document.addEventListener('keydown', (e) => {
         keys[e.code] = true;
-        if (e.code === 'Space' && !gameRunning) {
-            restartGame();
+        
+        // Game state controls
+        if (e.code === 'Space') {
+            if (gameState === 'start') {
+                startGame();
+            } else if (gameState === 'gameOver') {
+                startGame();
+            } else if (gameState === 'playing') {
+                // Space is used for shooting in game
+            } else if (gameState === 'paused') {
+                resumeGame();
+            }
+            e.preventDefault();
+        } else if (e.code === 'Escape' && gameState === 'playing') {
+            pauseGame();
+            e.preventDefault();
         }
-        e.preventDefault();
     });
     
     document.addEventListener('keyup', (e) => {
@@ -341,17 +483,69 @@
         // Shoot button
         shootButton.addEventListener('touchstart', (e) => {
             e.preventDefault();
-            if (gameRunning && Date.now() - lastShot > shootCooldown) {
+            if (gameState === 'playing' && Date.now() - lastShot > shootCooldown) {
                 createBullet(player.x + player.width / 2 - 1.5, player.y);
                 lastShot = Date.now();
             }
         });
     }
     
-    // Initialize mobile controls only on mobile
-    if (isMobile) {
-        initMobileControls();
-        joystickInitialized = true;
+    // Game state management functions
+    function startGame() {
+        gameState = 'playing';
+        score = 0;
+        lives = 3;
+        enemiesKilled = 0;
+        bullets = [];
+        enemies = [];
+        particles = [];
+        player.x = canvas.width / 2 - player.width / 2;
+        player.y = canvas.height - 50;
+        
+        // Update UI
+        document.getElementById('score').textContent = score;
+        document.getElementById('lives').textContent = lives;
+        
+        // Hide all panels
+        document.getElementById('startPanel').style.display = 'none';
+        document.getElementById('pausePanel').style.display = 'none';
+        document.getElementById('gameOverPanel').style.display = 'none';
+        document.getElementById('gameOver').style.display = 'none';
+    }
+    
+    function pauseGame() {
+        if (gameState !== 'playing') return;
+        gameState = 'paused';
+        
+        // Update pause panel with current stats
+        document.getElementById('pauseScore').textContent = score;
+        document.getElementById('pauseLives').textContent = lives;
+        document.getElementById('pausePanel').style.display = 'flex';
+    }
+    
+    function resumeGame() {
+        if (gameState !== 'paused') return;
+        gameState = 'playing';
+        document.getElementById('pausePanel').style.display = 'none';
+    }
+    
+    function gameOver() {
+        gameState = 'gameOver';
+        
+        // Update game over panel with final stats
+        document.getElementById('finalScore').textContent = score;
+        document.getElementById('enemiesKilled').textContent = enemiesKilled;
+        document.getElementById('gameOverPanel').style.display = 'flex';
+    }
+    
+    function restartFromPause() {
+        startGame();
+    }
+    
+    function backToStart() {
+        gameState = 'start';
+        document.getElementById('gameOverPanel').style.display = 'none';
+        document.getElementById('startPanel').style.display = 'flex';
     }
     
     // Particle system
@@ -393,7 +587,7 @@
     
     // Update functions
     function updatePlayer() {
-        if (!gameRunning) return;
+        if (gameState !== 'playing') return;
         
         let moveX = 0, moveY = 0;
         
@@ -450,8 +644,7 @@
                 lives--;
                 
                 if (lives <= 0) {
-                    gameRunning = false;
-                    document.getElementById('gameOver').style.display = 'block';
+                    gameOver();
                 }
                 
                 document.getElementById('lives').textContent = lives;
@@ -468,6 +661,7 @@
                     createParticles(enemies[i].x + enemies[i].width/2, enemies[i].y + enemies[i].height/2, 6, '#00ffff');
                     bullets.splice(j, 1);
                     enemies.splice(i, 1);
+                    enemiesKilled++;
                     score += 10;
                     document.getElementById('score').textContent = score;
                     break;
@@ -567,7 +761,7 @@
     }
     
     function update() {
-        if (gameRunning) {
+        if (gameState === 'playing') {
             updatePlayer();
             updateBullets();
             updateEnemies();
@@ -585,21 +779,16 @@
     }
     
     function restartGame() {
-        gameRunning = true;
-        score = 0;
-        lives = 3;
-        bullets = [];
-        enemies = [];
-        particles = [];
-        player.x = canvas.width / 2;
-        player.y = canvas.height - 50;
-        
-        document.getElementById('score').textContent = score;
-        document.getElementById('lives').textContent = lives;
-        document.getElementById('gameOver').style.display = 'none';
+        startGame();
     }
     
-    // Start the game
+    // Initialize mobile controls only on mobile
+    if (isMobile) {
+        initMobileControls();
+        joystickInitialized = true;
+    }
+    
+    // Start the game loop
     update();
 </script>
 ```
