@@ -147,6 +147,32 @@
         box-shadow: 0 0 30px rgba(128, 128, 128, 0.6);
     }
     
+    .fullscreen-btn {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: rgba(0, 255, 255, 0.2);
+        border: 1px solid rgba(0, 255, 255, 0.5);
+        color: #00ffff;
+        font-family: 'Courier New', monospace;
+        font-size: 12px;
+        padding: 8px 12px;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        z-index: 1000;
+        display: none;
+    }
+    
+    .fullscreen-btn:hover {
+        background: rgba(0, 255, 255, 0.3);
+        box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+    }
+    
+    .fullscreen-btn:active {
+        transform: scale(0.95);
+    }
+    
     .stats {
         color: #00ffff;
         font-size: 18px;
@@ -264,6 +290,11 @@
         </div>
 
 ```
+    <!-- Fullscreen Button (Mobile Only) -->
+    <button class="fullscreen-btn" id="fullscreenBtn" onclick="toggleFullscreen()">
+        📱 FULLSCREEN
+    </button>
+    
     <!-- Start Screen -->
     <div class="game-panel" id="startPanel">
         <div class="panel-title">SPACE SHOOTER</div>
@@ -272,6 +303,9 @@
             Use WASD or virtual joystick to move, space or fire button to shoot.
         </div>
         <button class="game-button" onclick="startGame()">PLAY GAME</button>
+        <div class="panel-subtitle" id="fullscreenHint" style="display: none; margin-top: 20px; color: #888; font-size: 14px;">
+            💡 Tap fullscreen button (top-right) for the best mobile experience!
+        </div>
     </div>
     
     <!-- Pause Screen -->
@@ -397,6 +431,57 @@
     });
     
     let joystickInitialized = false;
+    
+    // Fullscreen functionality
+    let isFullscreen = false;
+    
+    function toggleFullscreen() {
+        if (!document.fullscreenElement) {
+            // Enter fullscreen
+            const elem = document.documentElement;
+            if (elem.requestFullscreen) {
+                elem.requestFullscreen();
+            } else if (elem.webkitRequestFullscreen) {
+                elem.webkitRequestFullscreen();
+            } else if (elem.msRequestFullscreen) {
+                elem.msRequestFullscreen();
+            }
+        } else {
+            // Exit fullscreen
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.webkitExitFullscreen) {
+                document.webkitExitFullscreen();
+            } else if (document.msExitFullscreen) {
+                document.msExitFullscreen();
+            }
+        }
+    }
+    
+    // Listen for fullscreen changes
+    document.addEventListener('fullscreenchange', updateFullscreenButton);
+    document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
+    document.addEventListener('msfullscreenchange', updateFullscreenButton);
+    
+    function updateFullscreenButton() {
+        const btn = document.getElementById('fullscreenBtn');
+        if (document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement) {
+            btn.textContent = '📱 EXIT FULLSCREEN';
+            isFullscreen = true;
+            // Hide fullscreen hint when in fullscreen
+            document.getElementById('fullscreenHint').style.display = 'none';
+        } else {
+            btn.textContent = '📱 FULLSCREEN';
+            isFullscreen = false;
+        }
+    }
+    
+    // Show fullscreen hint on mobile start screen
+    function showFullscreenHint() {
+        if (isMobile && !isFullscreen) {
+            document.getElementById('fullscreenHint').style.display = 'block';
+        }
+    }
     
     // Create starfield
     for (let i = 0; i < 100; i++) {
@@ -546,6 +631,7 @@
         gameState = 'start';
         document.getElementById('gameOverPanel').style.display = 'none';
         document.getElementById('startPanel').style.display = 'flex';
+        showFullscreenHint();
     }
     
     // Particle system
@@ -786,6 +872,7 @@
     if (isMobile) {
         initMobileControls();
         joystickInitialized = true;
+        showFullscreenHint();
     }
     
     // Start the game loop
