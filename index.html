@@ -173,6 +173,31 @@
         transform: scale(0.95);
     }
     
+    .sound-btn {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background: rgba(0, 255, 255, 0.2);
+        border: 1px solid rgba(0, 255, 255, 0.5);
+        color: #00ffff;
+        font-family: 'Courier New', monospace;
+        font-size: 12px;
+        padding: 8px 12px;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        z-index: 1000;
+    }
+    
+    .sound-btn:hover {
+        background: rgba(0, 255, 255, 0.3);
+        box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+    }
+    
+    .sound-btn:active {
+        transform: scale(0.95);
+    }
+    
     .stats {
         color: #00ffff;
         font-size: 18px;
@@ -290,6 +315,11 @@
         </div>
 
 ```
+    <!-- Sound Toggle Button -->
+    <button class="sound-btn" id="soundBtn" onclick="toggleSound()">
+        🔊 SOUND ON
+    </button>
+    
     <!-- Fullscreen Button (Mobile Only) -->
     <button class="fullscreen-btn" id="fullscreenBtn" onclick="toggleFullscreen()">
         📱 FULLSCREEN
@@ -435,6 +465,153 @@
     // Fullscreen functionality
     let isFullscreen = false;
     
+    // Audio system
+    let audioContext;
+    let soundEnabled = true;
+    let backgroundMusic;
+    
+    // Initialize audio context
+    function initAudio() {
+        if (!audioContext) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        
+        // Resume audio context if suspended (required by some browsers)
+        if (audioContext.state === 'suspended') {
+            audioContext.resume();
+        }
+    }
+    
+    // Generate sound effects using Web Audio API
+    function playSound(type) {
+        if (!soundEnabled || !audioContext) return;
+        
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        switch(type) {
+            case 'shoot':
+                oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(400, audioContext.currentTime + 0.1);
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+                oscillator.start();
+                oscillator.stop(audioContext.currentTime + 0.1);
+                break;
+                
+            case 'enemyHit':
+                oscillator.frequency.setValueAtTime(300, audioContext.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(100, audioContext.currentTime + 0.2);
+                oscillator.type = 'sawtooth';
+                gainNode.gain.setValueAtTime(0.4, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+                oscillator.start();
+                oscillator.stop(audioContext.currentTime + 0.2);
+                break;
+                
+            case 'playerHit':
+                oscillator.frequency.setValueAtTime(200, audioContext.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(50, audioContext.currentTime + 0.5);
+                oscillator.type = 'sawtooth';
+                gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                oscillator.start();
+                oscillator.stop(audioContext.currentTime + 0.5);
+                break;
+                
+            case 'gameOver':
+                // Play a dramatic descending sound
+                for (let i = 0; i < 5; i++) {
+                    setTimeout(() => {
+                        const osc = audioContext.createOscillator();
+                        const gain = audioContext.createGain();
+                        osc.connect(gain);
+                        gain.connect(audioContext.destination);
+                        
+                        osc.frequency.setValueAtTime(400 - i * 60, audioContext.currentTime);
+                        osc.type = 'square';
+                        gain.gain.setValueAtTime(0.3, audioContext.currentTime);
+                        gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+                        osc.start();
+                        osc.stop(audioContext.currentTime + 0.3);
+                    }, i * 100);
+                }
+                break;
+                
+            case 'button':
+                oscillator.frequency.setValueAtTime(600, audioContext.currentTime);
+                oscillator.frequency.setValueAtTime(800, audioContext.currentTime + 0.05);
+                gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+                oscillator.start();
+                oscillator.stop(audioContext.currentTime + 0.1);
+                break;
+        }
+    }
+    
+    // Background music
+    function startBackgroundMusic() {
+        if (!soundEnabled || !audioContext || backgroundMusic) return;
+        
+        const createTone = (frequency, startTime, duration) => {
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.setValueAtTime(frequency, startTime);
+            oscillator.type = 'sine';
+            gainNode.gain.setValueAtTime(0.05, startTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+            
+            oscillator.start(startTime);
+            oscillator.stop(startTime + duration);
+        };
+        
+        // Simple ambient background music loop
+        const playMusicLoop = () => {
+            if (!soundEnabled || gameState === 'start' || gameState === 'gameOver') return;
+            
+            const startTime = audioContext.currentTime;
+            const notes = [220, 165, 196, 175]; // A3, E3, G3, F3
+            
+            notes.forEach((note, index) => {
+                createTone(note, startTime + index * 0.8, 0.6);
+            });
+            
+            // Schedule next loop
+            setTimeout(playMusicLoop, 3200);
+        };
+        
+        playMusicLoop();
+        backgroundMusic = true;
+    }
+    
+    function stopBackgroundMusic() {
+        backgroundMusic = false;
+    }
+    
+    function toggleSound() {
+        soundEnabled = !soundEnabled;
+        const btn = document.getElementById('soundBtn');
+        
+        if (soundEnabled) {
+            btn.textContent = '🔊 SOUND ON';
+            btn.style.color = '#00ffff';
+            if (!audioContext) initAudio();
+        } else {
+            btn.textContent = '🔇 SOUND OFF';
+            btn.style.color = '#666';
+            stopBackgroundMusic();
+        }
+        
+        playSound('button');
+    }
+    
     function toggleFullscreen() {
         if (!document.fullscreenElement) {
             // Enter fullscreen
@@ -577,6 +754,9 @@
     
     // Game state management functions
     function startGame() {
+        playSound('button');
+        initAudio(); // Initialize audio on user interaction
+        
         gameState = 'playing';
         score = 0;
         lives = 3;
@@ -596,11 +776,17 @@
         document.getElementById('pausePanel').style.display = 'none';
         document.getElementById('gameOverPanel').style.display = 'none';
         document.getElementById('gameOver').style.display = 'none';
+        
+        // Start background music
+        startBackgroundMusic();
     }
     
     function pauseGame() {
         if (gameState !== 'playing') return;
         gameState = 'paused';
+        
+        playSound('button');
+        stopBackgroundMusic();
         
         // Update pause panel with current stats
         document.getElementById('pauseScore').textContent = score;
@@ -611,11 +797,17 @@
     function resumeGame() {
         if (gameState !== 'paused') return;
         gameState = 'playing';
+        
+        playSound('button');
         document.getElementById('pausePanel').style.display = 'none';
+        startBackgroundMusic();
     }
     
     function gameOver() {
         gameState = 'gameOver';
+        
+        playSound('gameOver');
+        stopBackgroundMusic();
         
         // Update game over panel with final stats
         document.getElementById('finalScore').textContent = score;
@@ -624,11 +816,15 @@
     }
     
     function restartFromPause() {
+        stopBackgroundMusic();
         startGame();
     }
     
     function backToStart() {
         gameState = 'start';
+        playSound('button');
+        stopBackgroundMusic();
+        
         document.getElementById('gameOverPanel').style.display = 'none';
         document.getElementById('startPanel').style.display = 'flex';
         showFullscreenHint();
@@ -658,6 +854,7 @@
             height: 10,
             speed: 8
         });
+        playSound('shoot');
     }
     
     function createEnemy() {
@@ -728,6 +925,8 @@
                 createParticles(enemies[i].x + enemies[i].width/2, enemies[i].y + enemies[i].height/2, 8, '#ff4444');
                 enemies.splice(i, 1);
                 lives--;
+                
+                playSound('playerHit');
                 
                 if (lives <= 0) {
                     gameOver();
