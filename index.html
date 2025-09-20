@@ -388,23 +388,32 @@
         const isMobileDevice = window.innerWidth <= 768;
         
         if (isMobileDevice) {
-            // Mobile: 9:16 aspect ratio, full width
-            const width = window.innerWidth;
-            const height = Math.floor(width * 16 / 9);
+            // Mobile: 9:16 aspect ratio, fit to screen
+            const screenWidth = window.innerWidth;
+            const screenHeight = window.innerHeight;
             
-            // If calculated height exceeds viewport, adjust to fit
-            const maxHeight = window.innerHeight;
-            if (height > maxHeight) {
-                canvas.height = maxHeight;
-                canvas.width = Math.floor(maxHeight * 9 / 16);
-            } else {
-                canvas.width = width;
-                canvas.height = height;
+            // Calculate dimensions maintaining 9:16 ratio
+            let canvasWidth = screenWidth;
+            let canvasHeight = Math.floor(screenWidth * 16 / 9);
+            
+            // If height exceeds screen, fit by height instead
+            if (canvasHeight > screenHeight) {
+                canvasHeight = screenHeight;
+                canvasWidth = Math.floor(screenHeight * 9 / 16);
             }
+            
+            canvas.width = canvasWidth;
+            canvas.height = canvasHeight;
+            
+            // Ensure canvas CSS matches actual dimensions
+            canvas.style.width = canvasWidth + 'px';
+            canvas.style.height = canvasHeight + 'px';
         } else {
             // Desktop: fixed size
             canvas.width = 800;
             canvas.height = 600;
+            canvas.style.width = '800px';
+            canvas.style.height = '600px';
         }
         
         return { width: canvas.width, height: canvas.height, isMobile: isMobileDevice };
